@@ -1,0 +1,40 @@
+# Ignore Python virtual environment
+pyenv.cfg
+.vscode/
+
+# Ignore PyCharm project files
+.idea/
+
+# Ignore temporary files
+tmp/
+
+# Ignore compiled libraries
+*.dll
+*.dylib
+*.exe
+*.so
+
+# Ignore additional environment-specific files
+*.env
+*.config
+*.ini
+
+# Ignore specific application logs
+logs/
+*.log
+
+# Ignore system files
+.DS_Store
+Thumbs.db
+
+# Specific to this project
+# Ignore the local 'Lib' and 'Scripts' folders
+Lib/
+Scripts/
+app/services/__pycache__/
+__pycache__/
+app/__pycache__/
+app/config/__pycache__/
+share/
+# Ignore your local settings
+local_settings.py
