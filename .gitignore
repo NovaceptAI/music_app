@@ -38,3 +38,4 @@ app/config/__pycache__/
 share/
 # Ignore your local settings
 local_settings.py
+myenv/

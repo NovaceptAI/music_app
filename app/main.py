@@ -11,8 +11,9 @@ from app.config.config import Config
 
 def create_app():
     # Create a Flask application instance
-    app = Flask(__name__, template_folder='C:\\Users\\novneet.patnaik\\Documents\\GitHub\\music-app\\app\\templates',
-                static_folder='C:\\Users\\novneet.patnaik\\Documents\\GitHub\\music-app\\app\\static')
+    app = Flask(__name__)
+    # , template_folder='C:\\Users\\novneet.patnaik\\Documents\\GitHub\\music-app\\app\\templates',
+    #             static_folder='C:\\Users\\novneet.patnaik\\Documents\\GitHub\\music-app\\app\\static'
     # CORS(app)
     redis = Redis(host='localhost', port=6379, db=0)
 

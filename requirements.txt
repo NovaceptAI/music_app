@@ -5,3 +5,12 @@ pydub
 redis
 azure-cognitiveservices-speech
 aubio
+librosa
+essentia
+gunicorn
+tenacity
+openunmix
+torch
+crepe
+tensorflow
+magenta 

@@ -1,6 +1,7 @@
 import os
 import requests
 import uuid
+import librosa
 
 from app.services.bpm_detection_service import bpm_detection
 from app.services.scale_key_detection_service import scale_key_detection
@@ -14,6 +15,7 @@ from app.config.db_config import db
 from app import config
 from app.services.lyrics_service import lyrics_extraction
 from app.services.instrument_detection import detect_instruments
+from app.services.melody_chords_detection_service import melody_chords_detection
 # from app.services.read_video import analyze_video
 from werkzeug.utils import secure_filename
 
@@ -182,6 +184,10 @@ def analyze_audio():
                 document_results[feature] = scale_key_detection(file_path)
             elif feature == "bpm_detection":
                 document_results[feature] = bpm_detection(file_path)
+            elif feature == "melody_chords_detection":
+                document_results[feature] = melody_chords_detection(file_path)
+            elif feature == "melody_sentiment_detection":
+                document_results[feature] = analyze_melody_sentiment(file_path, OPENAI_API_KEY)
             else:
                 results = {"No Feature Selected"}
 
@@ -411,3 +417,44 @@ def get_document_content(file_path):
 #         'results': doc_info.get(b'results', b'{}').decode('utf-8')
 #     }
 #     return jsonify(progress)
+
+
+
+def analyze_melody_sentiment(audio_path, api_key):
+    # Extract the melody from the audio file
+    melody = extract_melody(audio_path)
+    
+    # Create a prompt for ChatGPT to analyze the melody sentiment
+    prompt = (
+            "Analyze the sentiment of the following melody represented as a sequence of MIDI notes: "
+            f"{melody}. Provide a direct response with the sentiment (e.g., happy, sad, neutral) and a score from 0 to 1, "
+            "where 1 represents strong sentiment and 0 represents no sentiment."
+        )
+    # Get the sentiment analysis result from ChatGPT
+    sentiment_response = get_chatgpt_response(prompt, OPENAI_API_KEY)
+
+    return sentiment_response
+
+def extract_melody(audio_path):
+    # Load the audio file
+    y, sr = librosa.load(audio_path, sr=None)
+
+    # Extract the harmonic component of the signal (melody)
+    y_harmonic, _ = librosa.effects.hpss(y)
+
+    # Estimate the pitches (melody) over time
+    pitches, magnitudes = librosa.core.piptrack(y=y_harmonic, sr=sr)
+
+    # Select the maximum magnitude pitch at each time step
+    melody = []
+    for t in range(pitches.shape[1]):
+        index = magnitudes[:, t].argmax()
+        pitch = pitches[index, t]
+        if pitch > 0:
+            melody.append(pitch)
+
+    # Convert frequencies to MIDI notes
+    melody_midi = librosa.hz_to_midi(melody)
+    
+    # Return the melody as a list of MIDI notes
+    return melody_midi.tolist()
