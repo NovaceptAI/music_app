@@ -167,22 +167,39 @@ POST /documents/analyze
 
 ## Configuration
 
-### Azure OpenAI Setup
-The application uses Azure OpenAI with multiple API keys for load balancing:
+### Environment Variables Setup
+Create a `.env` file in the project root based on `.env.example`:
 
-```python
-AZURE_OPENAI_API_KEYS = [
-    "key1",
-    "key2", 
-    "key3"
-]
-AZURE_OPENAI_API_BASES = [
-    "https://endpoint1.openai.azure.com",
-    "https://endpoint2.openai.azure.com",
-    "https://endpoint3.openai.azure.com"
-]
-AZURE_OPENAI_DEPLOYMENT = "gpt-4.1"
+```bash
+# Copy the example file
+cp .env.example .env
+
+# Edit the .env file with your actual credentials
+nano .env
 ```
+
+### Required Environment Variables
+```bash
+# Azure OpenAI API Keys (comma-separated)
+AZURE_OPENAI_API_KEYS=your_key1,your_key2,your_key3
+
+# Azure OpenAI API Base URLs (comma-separated)  
+AZURE_OPENAI_API_BASES=https://endpoint1.openai.azure.com,https://endpoint2.openai.azure.com,https://endpoint3.openai.azure.com
+
+# Azure OpenAI Deployment Name
+AZURE_OPENAI_DEPLOYMENT=gpt-4.1
+
+# Azure Text Analytics (for language detection)
+AZURE_TEXT_ANALYTICS_KEY=your_text_analytics_key
+AZURE_TEXT_ANALYTICS_ENDPOINT=https://your-endpoint.cognitiveservices.azure.com/
+
+# Azure Speech Services (for lyrics extraction)  
+AZURE_SPEECH_KEY=your_speech_key
+AZURE_SPEECH_REGION=your_region
+```
+
+### Azure OpenAI Setup
+The application uses Azure OpenAI with multiple API keys for load balancing and high availability. The service automatically rotates between keys if one fails.
 
 ## Error Handling
 
