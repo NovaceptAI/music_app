@@ -4,6 +4,7 @@ pymongo==4.8.0
 pydub
 redis
 azure-cognitiveservices-speech
+azure-ai-textanalytics
 aubio
 librosa
 essentia
@@ -13,4 +14,8 @@ openunmix
 torch
 crepe
 tensorflow
-magenta 
+magenta
+openai
+numpy
+scipy
+werkzeug 

@@ -19,6 +19,11 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'a_secret_key'
     CELERY_BROKER_URL = os.environ.get('REDIS_URL') or 'redis://localhost:6379/0'
     CELERY_RESULT_BACKEND = os.environ.get('REDIS_URL') or 'redis://localhost:6379/0'
+    
+    # Azure OpenAI Configuration - Use environment variables for security
+    AZURE_OPENAI_API_KEYS = os.environ.get('AZURE_OPENAI_API_KEYS', '').split(',') if os.environ.get('AZURE_OPENAI_API_KEYS') else []
+    AZURE_OPENAI_API_BASES = os.environ.get('AZURE_OPENAI_API_BASES', '').split(',') if os.environ.get('AZURE_OPENAI_API_BASES') else []
+    AZURE_OPENAI_DEPLOYMENT = os.environ.get('AZURE_OPENAI_DEPLOYMENT', 'gpt-4.1')
 
 
 class DevelopmentConfig(Config):

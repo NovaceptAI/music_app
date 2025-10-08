@@ -2,9 +2,18 @@ import os
 import requests
 import uuid
 import librosa
+import numpy as np
 
 from app.services.bpm_detection_service import bpm_detection
 from app.services.scale_key_detection_service import scale_key_detection
+from app.services.language_detector import detect_language
+from app.services.translation_service import translate_lyrics
+from app.services.summarization_service import summarize_lyrics
+from app.services.theme_identification_service import identify_themes
+from app.services.keyword_extraction_service import extract_keywords
+from app.services.segmentation_service import segment_lyrics
+from app.services.sentiment_analysis_service import analyze_sentiment, analyze_melody_sentiment
+from app.services.genre_classification_service import classify_genre
 from flask import Blueprint, request, jsonify, render_template
 # from app.services import
 import redis
@@ -154,7 +163,8 @@ def upload_files():
 def analyze_audio():
     document_ids = request.json.get('document_ids', [])  # Expect a list of document IDs
     features = request.json.get('features', [])
-    # keywords = request.json.get('keywords', []) if 'Keyword' in features else []
+    target_language = request.json.get('target_language', 'English')  # For translation
+    summary_type = request.json.get('summary_type', 'comprehensive')  # For summarization
 
     results = {}
 
@@ -173,23 +183,96 @@ def analyze_audio():
 
         # Apply each feature to the document
         document_results = {}
-        for feature in features:
-            # if feature == "keyword":
-            #     document_results[feature] = process_feature(file_path, feature, keywords)
-            if feature == "lyrics_extraction":
-                document_results[feature] = lyrics_extraction(file_path)
-            elif feature == "instrument_detection":
-                document_results[feature] = detect_instruments(file_path)
-            elif feature == "scale_key_detection":
-                document_results[feature] = scale_key_detection(file_path)
-            elif feature == "bpm_detection":
-                document_results[feature] = bpm_detection(file_path)
-            elif feature == "melody_chords_detection":
-                document_results[feature] = melody_chords_detection(file_path)
-            elif feature == "melody_sentiment_detection":
-                document_results[feature] = analyze_melody_sentiment(file_path, OPENAI_API_KEY)
+        
+        # First extract lyrics if needed for text-based analysis
+        extracted_lyrics = None
+        if any(feature in features for feature in ['language_detection', 'translation', 'summarization', 
+                                                  'theme_identification', 'keyword_extraction', 
+                                                  'segmentation', 'sentiment_analysis']):
+            if 'lyrics_extraction' in features:
+                extracted_lyrics = lyrics_extraction(file_path)
+                document_results['lyrics_extraction'] = extracted_lyrics
             else:
-                results = {"No Feature Selected"}
+                # Extract lyrics anyway for text analysis features
+                extracted_lyrics = lyrics_extraction(file_path)
+        
+        for feature in features:
+            try:
+                if feature == "lyrics_extraction":
+                    if extracted_lyrics is None:
+                        document_results[feature] = lyrics_extraction(file_path)
+                    else:
+                        document_results[feature] = extracted_lyrics
+                        
+                elif feature == "language_detection":
+                    if extracted_lyrics:
+                        document_results[feature] = detect_language(extracted_lyrics)
+                    else:
+                        document_results[feature] = {"error": "No lyrics available for language detection"}
+                        
+                elif feature == "translation":
+                    if extracted_lyrics:
+                        document_results[feature] = translate_lyrics(extracted_lyrics, target_language)
+                    else:
+                        document_results[feature] = {"error": "No lyrics available for translation"}
+                        
+                elif feature == "summarization":
+                    if extracted_lyrics:
+                        document_results[feature] = summarize_lyrics(extracted_lyrics, summary_type)
+                    else:
+                        document_results[feature] = {"error": "No lyrics available for summarization"}
+                        
+                elif feature == "theme_identification":
+                    if extracted_lyrics:
+                        document_results[feature] = identify_themes(extracted_lyrics)
+                    else:
+                        document_results[feature] = {"error": "No lyrics available for theme identification"}
+                        
+                elif feature == "keyword_extraction":
+                    if extracted_lyrics:
+                        document_results[feature] = extract_keywords(extracted_lyrics)
+                    else:
+                        document_results[feature] = {"error": "No lyrics available for keyword extraction"}
+                        
+                elif feature == "segmentation":
+                    if extracted_lyrics:
+                        document_results[feature] = segment_lyrics(extracted_lyrics)
+                    else:
+                        document_results[feature] = {"error": "No lyrics available for segmentation"}
+                        
+                elif feature == "sentiment_analysis":
+                    if extracted_lyrics:
+                        document_results[feature] = analyze_sentiment(extracted_lyrics)
+                    else:
+                        document_results[feature] = {"error": "No lyrics available for sentiment analysis"}
+                        
+                elif feature == "instrument_detection":
+                    document_results[feature] = detect_instruments(file_path)
+                    
+                elif feature == "scale_key_detection":
+                    document_results[feature] = scale_key_detection(file_path)
+                    
+                elif feature == "bpm_detection":
+                    document_results[feature] = bpm_detection(file_path)
+                    
+                elif feature == "melody_chords_detection":
+                    document_results[feature] = melody_chords_detection(file_path)
+                    
+                elif feature == "melody_sentiment_detection":
+                    melody_features = extract_melody_features_for_sentiment(file_path)
+                    if "error" not in melody_features:
+                        document_results[feature] = analyze_melody_sentiment(melody_features)
+                    else:
+                        document_results[feature] = melody_features
+                    
+                elif feature == "genre_classification":
+                    document_results[feature] = classify_genre(audio_path=file_path, lyrics=extracted_lyrics)
+                    
+                else:
+                    document_results[feature] = {"error": f"Unknown feature: {feature}"}
+                    
+            except Exception as e:
+                document_results[feature] = {"error": f"Processing failed: {str(e)}"}
 
         # Update Redis with the result and status of the document
         r.hmset(doc_info_key, {'status': 'completed', 'results': str(document_results)})
@@ -420,7 +503,45 @@ def get_document_content(file_path):
 
 
 
-def analyze_melody_sentiment(audio_path, api_key):
+def extract_melody_features_for_sentiment(audio_path):
+    """Extract melody features for sentiment analysis"""
+    try:
+        # Load the audio file
+        y, sr = librosa.load(audio_path, sr=None)
+
+        # Extract the harmonic component of the signal (melody)
+        y_harmonic, _ = librosa.effects.hpss(y)
+
+        # Estimate the pitches (melody) over time
+        pitches, magnitudes = librosa.core.piptrack(y=y_harmonic, sr=sr)
+
+        # Select the maximum magnitude pitch at each time step
+        melody = []
+        for t in range(pitches.shape[1]):
+            index = magnitudes[:, t].argmax()
+            pitch = pitches[index, t]
+            if pitch > 0:
+                melody.append(pitch)
+
+        # Convert frequencies to MIDI notes
+        melody_midi = librosa.hz_to_midi(melody)
+        
+        # Extract additional features for sentiment analysis
+        features = {
+            "melody_midi": melody_midi.tolist(),
+            "pitch_range": float(np.max(melody_midi) - np.min(melody_midi)) if len(melody_midi) > 0 else 0,
+            "average_pitch": float(np.mean(melody_midi)) if len(melody_midi) > 0 else 0,
+            "pitch_variance": float(np.var(melody_midi)) if len(melody_midi) > 0 else 0,
+            "tempo": float(librosa.beat.tempo(y=y, sr=sr)[0]),
+            "key_signature": scale_key_detection(audio_path)
+        }
+        
+        return features
+    except Exception as e:
+        return {"error": f"Feature extraction failed: {str(e)}"}
+
+
+def analyze_melody_sentiment_deprecated(audio_path, api_key):
     # Extract the melody from the audio file
     melody = extract_melody(audio_path)
     
